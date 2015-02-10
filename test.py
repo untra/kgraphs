@@ -7,8 +7,6 @@ from networkx.algorithms import isomorphism
 
 
 
-
-
 def new_kgraph(v,ka):
     nodes = string.ascii_lowercase[:v]
     G=nx.MultiDiGraph(k=ka)
@@ -116,9 +114,20 @@ def ex8():
     G.add_edge('b','a', k=3)
     return G
 
+def ex9():
+    nodes = ['b','a']
+    G=nx.MultiDiGraph(k=2)
+    G.add_nodes_from(nodes);
+    G.add_edge('a','b', k=1)
+    G.add_edge('a','b', k=2)
+    G.add_edge('a','a', k=1)
+    G.add_edge('b','b', k=1)
+    # G.add_edge('b','b', k=2)
+    return G
 
 
-def draw_kgraph(G,suppress_draw=False):
+
+def draw_kgraph(G,suppress_draw=False,save_as=None):
     k = G.graph['k']
     #edges = [ (u,v) for u,v,edata in G.edges(data=True) if edata == 'r']
     pos=nx.spring_layout(G)
@@ -152,6 +161,9 @@ def draw_kgraph(G,suppress_draw=False):
     plt.axis('off')
     if not(suppress_draw):
         plt.show()
+    else:
+        if(save_as != None):
+            plt.savefig(save_as)
     #A=nx.to_agraph(G)        # convert to a graphviz graph
     #A.layout()            # neato layout
     #A.draw("k5.png")       # write postscript in k5.ps with neato layout
@@ -704,7 +716,8 @@ def paths_length_x(G,a,b,x=3,cycles=None):
 # They have few guarentees of shape, size or performance.
 # Consider the task of finding all paths from a to b of no specified length
 # because a kgraph is not a DAG, there can an infinite number of paths from a to b
-# if there is a cycle between a and b
+# if there is a cycle between a and b, BFS would become indefinitely big
+# This version of BFS returns the list of all paths of finite length from a not extending past b
 def bfs(graph, a,b,length=3):
     # maintain a queue of paths
     complete = []
@@ -743,13 +756,13 @@ def bfs(graph, a,b,length=3):
 
 
 #This is the immediate code that gets run
-G = ex8()
+G = ex9()
 
-# print "G is a valid kgraph: {0}".format(valid_kgraph(G))
+print "G is a valid kgraph: {0}".format(valid_kgraph(G))
 # print bfs(G,'b','a',3)
 # print "has complex perm path = {0}".format(has_complex_perm_path(G, ('b', 'a', (1, 2))))
 # print nx.get_edge_attributes(G,'k')
-# draw_kgraph(G,False)
+draw_kgraph(G,True,"fdsa.png")
 # # for i in nx.all_simple_paths(G, 'v','w'): 
 # #     print i
 # # for i in nx.simple_cycles(G):
@@ -760,8 +773,11 @@ graphset = all_kgraphs_naive(3,3)
 print "how many naive graphs: {0}".format(len(graphset))
 trimmedset = trim_graphs(graphset,3)
 print "how many trimmed graphs: {0}".format(len(trimmedset))
+i = 0
 for g in trimmedset:
-    print "G is a valid kgraph: {0}".format(valid_kgraph(g))
-    print g.edges()
-    print g.nodes()
-    draw_kgraph(g,False)
+    i += 1
+    # print "G is a valid kgraph: {0}".format(valid_kgraph(g))
+    # print g.edges()
+    # print g.nodes()
+    draw_kgraph(g,True,"3_3/{0}.png".format(i))
+

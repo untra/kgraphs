@@ -3,6 +3,7 @@ import math
 from operator import mul    # or mul=lambda x,y:x*y
 from fractions import Fraction
 
+# counts the number of set bits in a number
 def bitsoncount(x):
     return bin(x).count('1')
 
