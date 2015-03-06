@@ -3,10 +3,12 @@ import matplotlib.pyplot as plt
 import itertools as it
 import string
 import sys
+import cmath as cmath
+import math as math
 from networkx.algorithms import isomorphism
 
 
-
+# creates a new kgraph of v vertices and ka colors
 def new_kgraph(v,ka):
     nodes = string.ascii_lowercase[:v]
     G=nx.MultiDiGraph(k=ka)
@@ -120,14 +122,15 @@ def ex9():
     G.add_nodes_from(nodes);
     G.add_edge('a','b', k=1)
     G.add_edge('a','b', k=2)
-    G.add_edge('a','a', k=1)
-    G.add_edge('b','b', k=1)
+    # G.add_edge('a','a', k=1)
+    # G.add_edge('b','b', k=1)
     # G.add_edge('b','b', k=2)
     return G
 
 
 
 def draw_kgraph(G,suppress_draw=False,save_as=None):
+    plt.clf()
     k = G.graph['k']
     #edges = [ (u,v) for u,v,edata in G.edges(data=True) if edata == 'r']
     pos=nx.spring_layout(G)
@@ -218,30 +221,11 @@ def valid_kgraph(G,suppress_warnings=False):
     neededpathlist = []
     v = 2 if (len(G.nodes()) < 3) else 3
     #Get every node
-    for a in G.nodes():
-        for b in G.nodes():
-            #gets every *simple* path from a to b
-            #note that a simple path is a path that does not repeat any node
-            #if G has a cycle, then it gets all paths of length 3 instead
-            # for y in ( paths_length_x(G,a,b,3,cycles) if has_cycle else nx.all_simple_paths(G,a,b)):
-            for y in bfs(G,a,b,v):
-                #gets the path permutation
-                p = path_permutation(G,y)
-                # gets the ending node of the bfs path
-                f = y[-1]
-                pl = (a,f,tuple(p))
-                # print pl
-                #adds the new known path and its path permutation to the knownpathlist
-                knownpathlist.append(pl)
-                #creates q, the list of path permutations from a to b that must also 
-                #be in G if G is a valid kgraph
-                # print p
-                q = list(set(it.permutations(p)))
-                # print "p = {0}".format(p)
-                # print "q = {0}".format(q)
-                for x in q:
-                    ql = (a,f,x)
-                    neededpathlist.append(ql)
+    for p in build_paths(G,v):
+        #adds the new known path and its path permutation to the knownpathlist
+        knownpathlist.append(p)
+        for x in build_needed_paths(p):
+            neededpathlist.append(x)
                 # if(a == 'b' and b == 'a'):
                 #     print "PANIC OUTPUT"
                 #     print "f = {0}".format(f)
@@ -298,6 +282,7 @@ def all_kgraphs_naive(V,K):
             index += 1
         G = new_kgraph(V,K)
         #for every edge
+        print digit
         for m in range(V):
             
             # print m
@@ -419,23 +404,28 @@ def path_permutation(G,path,parallel=0):
     for p in zip(path,path[1:]):
         #reset the list of perms
         # perms = []
-        for c in range(parallel+1):
-            # print pn
-            # if G.has_edge(*pn):
-            #   #adds to the list of permutations
-            # print pn
-            l = G.get_edge_data(p[0],p[1],c)
-            perms.append(l['k'])
-            break;
+        # print "p is {0}".format(p)
+        # print "parallel is {0}".format(parallel)
+        passes = parallel
+        while True:
+            try:
+                l = G.get_edge_data(p[0],p[1],passes)
+                color = l['k']
+            except TypeError:
+                passes -= 1
+                continue
+            perms.append(color)
+            break
     return perms
 
 #returns the shape of a permutation path
-def shape(path,k=2):
+def shape(path,g):
+    k = g.graph['k']
     shape = {}
     for i in range(k):
         shape[i] = 0;
     for i in path:
-        shape[i] += 1
+        shape[i-1] += 1
     return tuple(j for i,j in shape.items())
 
 #given a list of simple cycles, this function returns an expanded list containing duplicate cycles that also start from
@@ -748,36 +738,154 @@ def bfs(graph, a,b,length=3):
 
     return complete
 
+# builds the set of known paths of maximum length v
+# returns a list of unique tuples containing start node, end node and path permutation
+def build_paths(G,v=3):
+    paths = list()
+    for a in G.nodes():
+        for b in G.nodes():
+            for y in bfs(G,a,b,v):
+                # print "YYY {0}".format(y)
+                # gets the ending node of the bfs path
+                f = y[-1]
+                # parallel = 1
+                parallel = G.number_of_edges(a,f)
+                # print "a / f / parallel is {0} {1} {2}".format(a,f,parallel)
+                for c in range(parallel):
+                    p = path_permutation(G,y,c)
+                    pl = (a,f,tuple(p),tuple(y))
+                    # print pl
+                    #adds the new known path and its path permutation to the knownpathlist
+                    # print "Pl {0}".format(pl)
+                    paths.append(pl)
+    return list(set(paths))
 
+# builds a list of needed paths from p such that G would be a valid kgraph
 
+def build_needed_paths(p):
+    needed = list()
+    # creates q, the list of path permutations from a to b that must also 
+    # be in G if G is a valid kgraph
+    q = list(set(it.permutations(p[2])))
+    # print "p = {0}".format(p)
+    # print "q = {0}".format(q)
+    for x in q:
+        ql = (p[0],p[1],x)
+        needed.append(ql)
+    return list(set(needed))
 
+# builds the set of equivalence classes
+def build_equivalence_classes(G):
+    v = 2 if (len(G.nodes()) < 3) else 3
+    equiv = {}
+    paths = build_paths(G,v)
+    for x in paths:
+        # print "path is {0}".format(x)
+        _shape = shape(x[2],G)
+        # print "shape is {0}".format(_shape)
+        key = (x[0],x[1],_shape)
+        if key not in equiv.keys():
+            equiv[key] = list()
+        # append x to our equivalence class
+        # hacky way to account for equivalence classes as a result of parallel edges.
+        # All it does is ads the same path c times
+        # where c is the number of paralel paths
+        # This will have to be changed if account for something other than edge color.
+        for c in range(G.number_of_edges(x[0],x[1])):
+            equiv[key].append(x)
+    return equiv
 
+def print_equiv_classes(equiv):
+    for k in equiv.keys():
+        print "{0}".format(k)
+        for v in equiv[k]:
+            print "\t{0}".format(v)
 
+# apends to an equiv class a new value designating the assigned cocycle value
+# in this case it assigns the value 1
+def assign_trivial_2ocycle(equiv):
+    appended = {}
+    for k in equiv.keys():
+        appended[k] = list()
+        for v in equiv[k]:
+            b = v + ((1 + 0j),)
+            appended[k].append(b[:])
+    return appended
+
+# apends to an equiv class a new value designating the assigned cocycle value
+# in this case it assigns
+def assign_complex_2cocycle(equiv):
+    appended = {}
+    twopi = 2* math.pi
+    for k in equiv.keys():
+        appended[k] = list()
+        # gets the number of relations in the equivalence class
+        count = max(len(equiv[k]),1)
+        # print count
+        i = 0
+        theta = (twopi / count)
+        for v in equiv[k]:
+            c = unit_circle_complex(theta*i)
+            b = v + (c,)
+            appended[k].append(b[:])
+            i += 1
+    return appended
+
+# gets the value of the complex number on the unit circle at a certain
+def unit_circle_complex(theta, sigfigs = 6):
+    # return 1 in the complex plane if theta is 0
+    if(theta == 0):
+        return (1 + 0j)
+    r = round(math.cos(theta),sigfigs)
+    i = round(math.sin(theta),sigfigs)
+    return complex(r, i)
+
+# takes a kgraph and runs a gauntlet of tests.
+# Begins by determining if it is a valid kgraph.
+# if not, it stops execution.
+# it then builds it's equivalence classes and assigns arbitray complex 2cocycles
+def kgraph_gauntlet(G):
+    valid = valid_kgraph(G, True)
+    print "G is a valid kgraph: {0}".format(valid)
+    if not valid:
+        return
+    equiv = build_equivalence_classes(G)
+    cocycles = assign_complex_2cocycle(equiv)
+    print_equiv_classes(cocycles)
+    draw_kgraph(G,True,"gauntlet.png")
 
 
 #This is the immediate code that gets run
-G = ex9()
-
-print "G is a valid kgraph: {0}".format(valid_kgraph(G))
-# print bfs(G,'b','a',3)
+G = ex5()
+kgraph_gauntlet(G)
+# print "G is a valid kgraph: {0}".format(valid_kgraph(G))
+# print "G is is_weakly_connected: {0}".format(valid_kgraph(G))
+# print bfs(G,'a','b',3)
 # print "has complex perm path = {0}".format(has_complex_perm_path(G, ('b', 'a', (1, 2))))
 # print nx.get_edge_attributes(G,'k')
-draw_kgraph(G,True,"fdsa.png")
+# draw_kgraph(G,True,"fdsa.png")
+# equiv_classes = build_equivalence_classes(G)
+# print "equivalence classes = \n{0}".format(equiv_classes)
+# print "\n\n"
+# print "equivalence class keys = \n{0}".format(equiv_classes.keys())
+# equiv_classes = assign_complex_2cocycle(equiv_classes)
+# print_equiv_classes(equiv_classes)
+
 # # for i in nx.all_simple_paths(G, 'v','w'): 
 # #     print i
 # # for i in nx.simple_cycles(G):
 # #     print i
 # print "G is an invalid kgraph: {0}".format(invalid(G,2))
 
-graphset = all_kgraphs_naive(3,3)
-print "how many naive graphs: {0}".format(len(graphset))
-trimmedset = trim_graphs(graphset,3)
-print "how many trimmed graphs: {0}".format(len(trimmedset))
-i = 0
-for g in trimmedset:
-    i += 1
-    # print "G is a valid kgraph: {0}".format(valid_kgraph(g))
-    # print g.edges()
-    # print g.nodes()
-    draw_kgraph(g,True,"3_3/{0}.png".format(i))
+# graphset = all_kgraphs_naive(2,2)
+# print "how many naive graphs: {0}".format(len(graphset))
+# trimmedset = trim_graphs(graphset,3)
+# print "how many trimmed graphs: {0}".format(len(trimmedset))
+# i = 0
+# for g in trimmedset:
+#     i += 1
+#     # print "G is a valid kgraph: {0}".format(valid_kgraph(g))
+#     # print g.edges()
+#     # print g.nodes()
+#     draw_kgraph(g,True,"2_2/{0}.png".format(i))
 
