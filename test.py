@@ -1,3 +1,4 @@
+import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import itertools as it
@@ -16,6 +17,7 @@ def new_kgraph(v,ka):
     return G
 
 #example 1: valid 2graph with parallel edges and two self loops
+
 def ex1():
     nodes = ['v','w']
     G=nx.MultiDiGraph(k=2)
@@ -32,6 +34,8 @@ def ex1():
     return G
 
 #example 2: valid 2graph with no self loops
+# example 5.4 of homology for higher rank graphs
+# kumjian, pask, sims
 def ex2():
     nodes = ['u','v','w','x','y']
     G=nx.MultiDiGraph(k=2)
@@ -222,6 +226,7 @@ def valid_kgraph(G,suppress_warnings=False):
     v = 2 if (len(G.nodes()) < 3) else 3
     #Get every node
     for p in build_paths(G,v):
+        # print p
         #adds the new known path and its path permutation to the knownpathlist
         knownpathlist.append(p)
         for x in build_needed_paths(p):
@@ -420,11 +425,13 @@ def path_permutation(G,path,parallel=0):
 
 #returns the shape of a permutation path
 def shape(path,g):
+    # print "path = {0}".format(path)
     k = g.graph['k']
     shape = {}
     for i in range(k):
         shape[i] = 0;
     for i in path:
+        # print shape
         shape[i-1] += 1
     return tuple(j for i,j in shape.items())
 
@@ -709,6 +716,9 @@ def paths_length_x(G,a,b,x=3,cycles=None):
 # if there is a cycle between a and b, BFS would become indefinitely big
 # This version of BFS returns the list of all paths of finite length from a not extending past b
 def bfs(graph, a,b,length=3):
+    # print "a = {0}".format(a)
+    # print "b = {0}".format(b)
+    # print "length = {0}".format(length)
     # maintain a queue of paths
     complete = []
     queue = []
@@ -719,6 +729,7 @@ def bfs(graph, a,b,length=3):
     while queue:
         # get the first path from the queue
         path = queue.pop(0)
+        # print path
         if(len(path)==length+1):
             # complete.append(path)
             continue
@@ -744,16 +755,23 @@ def build_paths(G,v=3):
     paths = list()
     for a in G.nodes():
         for b in G.nodes():
+            # print "a = {0}, b = {1}".format(a,b)
             for y in bfs(G,a,b,v):
                 # print "YYY {0}".format(y)
                 # gets the ending node of the bfs path
                 f = y[-1]
                 # parallel = 1
                 parallel = G.number_of_edges(a,f)
+                # ineteresting, yet jankity solution.
+                if(parallel == 0):
+                    p = path_permutation(G,y,0)
+                    pl = (a,f,tuple(p))
+                    paths.append(pl)
                 # print "a / f / parallel is {0} {1} {2}".format(a,f,parallel)
-                for c in range(parallel):
+                for c in range(parallel-1):
                     p = path_permutation(G,y,c)
-                    pl = (a,f,tuple(p),tuple(y))
+                    pl = (a,f,tuple(p))
+                    # pl = (a,f,tuple(p),tuple(y))
                     # print pl
                     #adds the new known path and its path permutation to the knownpathlist
                     # print "Pl {0}".format(pl)
@@ -775,10 +793,13 @@ def build_needed_paths(p):
     return list(set(needed))
 
 # builds the set of equivalence classes
-def build_equivalence_classes(G):
-    v = 2 if (len(G.nodes()) < 3) else 3
+def build_equivalence_classes(G, v = -1):
+    if(v <= 0):
+        v = 2 if (len(G.nodes()) < 3) else 3
+    # print "v = {0}".format(v)
     equiv = {}
     paths = build_paths(G,v)
+    # print paths
     for x in paths:
         # print "path is {0}".format(x)
         _shape = shape(x[2],G)
@@ -815,6 +836,7 @@ def assign_trivial_2ocycle(equiv):
 # apends to an equiv class a new value designating the assigned cocycle value
 # in this case it assigns
 def assign_complex_2cocycle(equiv):
+    cloned = list()
     appended = {}
     twopi = 2* math.pi
     for k in equiv.keys():
@@ -825,10 +847,21 @@ def assign_complex_2cocycle(equiv):
         i = 0
         theta = (twopi / count)
         for v in equiv[k]:
+            # print "v is {0}".format(v)
+            # print "cloned is {0}".format(cloned)
+            if v in cloned:
+                # print "skipping"
+                continue
+            # cloned.append(v)
             c = unit_circle_complex(theta*i)
-            b = v + (c,)
-            appended[k].append(b[:])
-            i += 1
+            for n in build_needed_paths(v):
+                # print "n is {0}".format(n)
+                cloned.append(n)
+                b = n + (c,)
+                appended[k].append(b[:])
+                i += 1
+            # remove the original term from the list if there are parallel edges
+            cloned.remove(v)
     return appended
 
 # gets the value of the complex number on the unit circle at a certain
@@ -850,32 +883,72 @@ def kgraph_gauntlet(G):
     if not valid:
         return
     equiv = build_equivalence_classes(G)
+    # print equiv
     cocycles = assign_complex_2cocycle(equiv)
+    print "equivalance classes:"
     print_equiv_classes(cocycles)
     draw_kgraph(G,True,"gauntlet.png")
 
 
-#This is the immediate code that gets run
-G = ex5()
-kgraph_gauntlet(G)
-# print "G is a valid kgraph: {0}".format(valid_kgraph(G))
-# print "G is is_weakly_connected: {0}".format(valid_kgraph(G))
-# print bfs(G,'a','b',3)
-# print "has complex perm path = {0}".format(has_complex_perm_path(G, ('b', 'a', (1, 2))))
-# print nx.get_edge_attributes(G,'k')
-# draw_kgraph(G,True,"fdsa.png")
-# equiv_classes = build_equivalence_classes(G)
-# print "equivalence classes = \n{0}".format(equiv_classes)
-# print "\n\n"
-# print "equivalence class keys = \n{0}".format(equiv_classes.keys())
-# equiv_classes = assign_complex_2cocycle(equiv_classes)
-# print_equiv_classes(equiv_classes)
+# returns true or false if G is approximately finite
+def is_approximately_finite(G):
+    # if G has a cycle, it is not AF
+    if not nx.is_directed_acyclic_graph(G):
+        return False
+    # Because G must be a DAG, the longest path can be of length v. We have an upperbound
+    v = len(nx.nodes(G))
+    # print "v = {0}".format(v)
+    equiv = build_equivalence_classes(G,v)
+    # builds the proposed AF function
+    func = build_AF_function(G, equiv)
+    print func
+    for k in equiv.keys():
+        s = func[k[0]]
+        r = func[k[1]]
+        dnp = np.subtract(r, s)
+        # print dnp
+        d = tuple(dnp)
+        if(k[2] != d):
+            print "bad! {0} != {1}".format(k[2], d)
+            return False
+    return True
 
-# # for i in nx.all_simple_paths(G, 'v','w'): 
-# #     print i
-# # for i in nx.simple_cycles(G):
-# #     print i
-# print "G is an invalid kgraph: {0}".format(invalid(G,2))
+# expects G to be a DAG
+def build_AF_function(G, equiv = None):
+    K = G.graph['k']
+    # Because G must be a DAG, the longest path can be of length v. We have an upperbound
+    v = len(nx.nodes(G))
+    if equiv == None:
+        equiv = build_equivalence_classes(G,v)
+    func = {}
+    # print_equiv_classes(equiv)
+    for x in equiv.keys():
+        if not source_node(G,x[0]):
+            continue
+        else:
+            func[x[0]] = tuple( [ 0 for i in range(0, K)] )
+            func[x[1]] = x[2]
+    return func
+
+
+def source_node(G,n):
+    if len(G.in_edges(n)) == 0:
+        return True
+    return False
+
+def sink_node(G,n):
+    if len(G.out_edges(n)) == 0:
+        return True
+    return False
+
+
+
+#This is the immediate code that gets run
+
+G = ex2()
+kgraph_gauntlet(G)
+# print  tuple( [ '0' for i in range(0, 5)] )
+print "G is Approximately Finite: {0}".format(is_approximately_finite(G))
 
 # graphset = all_kgraphs_naive(2,2)
 # print "how many naive graphs: {0}".format(len(graphset))
